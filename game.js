@@ -133,10 +133,38 @@ let sansFace = 0;
 // dialogue state. strings: array of raw textdata strings. halt: 0 typing, 1 wait, 2 end, 5 choice.
 let DLG = null;
 const keys = {};
+// webaudio unlocks on first key. buffers decode once, then play on demand.
+let AC = null; const SBUF = {}, SPLAY = {};
+function bootAudio() {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    for (const n of ["SND_TXT1", "snd_txtsans", "snd_squeak", "snd_dumbvictory"]) {
+      if (SBUF[n] || !AC) continue;
+      fetch("assets/" + n + ".wav").then((r) => r.arrayBuffer()).then((b) => AC.decodeAudioData(b)).then((d) => SBUF[n] = d).catch(() => {});
+    }
+  } catch {}
+}
+// snd_stop then snd_play: restart the same buffer, cut the old voice.
+// 3ms fade on the cutoff so 30 restarts a second do not click.
+function sfx(n) {
+  if (!AC || !SBUF[n]) return;
+  if (SPLAY[n]) {
+    const o = SPLAY[n];
+    try { o.g.gain.linearRampToValueAtTime(0, AC.currentTime + 0.003); o.v.stop(AC.currentTime + 0.01); } catch {}
+  }
+  const v = AC.createBufferSource();
+  const g = AC.createGain();
+  v.buffer = SBUF[n]; v.connect(g); g.connect(AC.destination); v.start();
+  SPLAY[n] = { v, g };
+}
 
 addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
+  bootAudio();
+// gml keypress has no autorepeat. held keys poll from keys, not events.
+  if (e.repeat) return;
   keys[k] = true;
   if (k === "r") { closeDialogue(); resetAttempt(); }
   if (k === "z" || k === "enter") pressConfirm();
@@ -208,6 +236,7 @@ function holeCapture() {
   if (B.rolltime > 600) idx = 5;
   if (B.size < 0.6) idx = 6;
   if (B.size > 0.3) B.size -= 0.1;
+  sfx("snd_dumbvictory");
   prize(idx);
 }
 
@@ -268,6 +297,7 @@ function pressCancel() {
 function moveChoice(d) {
   if (!DLG || !DLG.choice || DLG.chooseTimer > 0) return;
   DLG.sel = d < 0 ? 0 : 1;
+  sfx("snd_squeak");
 }
 function confirmChoice() {
   if (!DLG || !DLG.choice || DLG.chooseTimer > 0) return;
@@ -307,6 +337,8 @@ function dlgStep() {
       continue;
     }
     DLG.pos = p;
+// typer 5 beeps SND_TXT1, typer 17 beeps sans. spaces stay silent.
+    if (ch !== " " && ch !== "　") sfx(DLG.typer === 17 ? "snd_txtsans" : "SND_TXT1");
     return;
   }
 }
@@ -340,7 +372,7 @@ function startTalk(id) {
   if (id === "sign") openDialogue(["room3_112"], { typer: 5 });
   else if (id === "hole") openHoleDialogue();
   else if (id === "sans") openDialogue(sansStrings(235), { typer: 17, face: true, msc: 235, onClose: () => { sansFace = 0; } });
-  else if (id === "drake") openDialogue(["cd_82", "cd_83"], { typer: 5 });
+  else if (id === "drake") openDialogue(["cd_82", "cd_83", "cd_84"], { typer: 5 });
   else if (id === "snow") openDialogue(["sn_102", "sn_103"], { typer: 5 });
   else if (id === "cream") talkCream();
 }
