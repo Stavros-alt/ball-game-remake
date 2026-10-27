@@ -148,6 +148,10 @@ addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 
 function resetAttempt() {
   P.x = PSTART.x; P.y = PSTART.y; P.face = 0; P.frame = 0; P.vx = P.vy = 0; P.sliding = false;
+  if ((P.x % 3) === 2) P.x += 1;
+  if ((P.x % 3) === 1) P.x -= 1;
+  if ((P.y % 3) === 2) P.y += 1;
+  if ((P.y % 3) === 1) P.y -= 1;
   px = P.x; py = P.y;
   B.size = 2; B.vx = B.vy = 0; B.t = 0; B.shrinko = 30;
   B.rolltime = 0; B.timeinc = 0; B.alarm = 0; B.falling = 0; B.angle = 0;
@@ -160,8 +164,6 @@ function rectsHit(a, b) {
 }
 // spr_mainchar* bbox is (0,19) to (19,29): 20x11 feet box.
 function playerBox() { return { x: P.x, y: P.y + 19, w: 20, h: 11 }; }
-// full sprite box, for the ice trigger (collision_rectangle uses bbox).
-function playerFullBox() { return { x: P.x, y: P.y, w: 20, h: 30 }; }
 // spr_rollsnow is 10x10, origin center, bbox (2,4) to (7,9), scaled by size.
 function ballBox() { const s = B.size; return { x: B.x - 3 * s, y: B.y - s, w: 6 * s, h: 6 * s }; }
 function boxGap(a, b) {
@@ -205,6 +207,7 @@ function holeCapture() {
   if (B.rolltime > 450) idx = 4;
   if (B.rolltime > 600) idx = 5;
   if (B.size < 0.6) idx = 6;
+  if (B.size > 0.3) B.size -= 0.1;
   prize(idx);
 }
 
@@ -496,8 +499,9 @@ function collidePlayer() {
   if (NPCS.some((s) => rectsHit(playerBox(), s))) hitNpc();
 }
 
+// doorparent overlap uses the feet bbox, same as every other collision.
 function iceOverlap() {
-  return ICE.some(([ix, iy]) => rectsHit(playerFullBox(), { x: ix, y: iy, w: 40, h: 40 }));
+  return ICE.some(([ix, iy]) => rectsHit(playerBox(), { x: ix, y: iy, w: 40, h: 40 }));
 }
 // ice slide take, from obj_iceevent Other_19: four independent held-key ifs
 // (up, down, right, left), so down overwrites up and left overwrites right.
@@ -519,24 +523,55 @@ function slideCollide() {
     NPCS.some((s) => rectsHit(b, s));
   if (hit) { P.x = px; P.y = py; }
 }
+// one walked step. left wins over right, up wins over down.
+function walkInput(L, R, U, D) {
+  if (L) {
+    if (!P.moving) P.frame = 1;
+    P.moving = true;
+    P.x -= 3;
+    if (!(U && P.face === 2) && !(D && P.face === 0)) P.face = 3;
+  }
+  if (U) {
+    if (!P.moving) P.frame = 1;
+    P.moving = true;
+    P.y -= 3;
+    if (!(R && P.face === 1) && !(L && P.face === 3)) P.face = 2;
+  }
+  if (R && !L) {
+    if (!P.moving) P.frame = 1;
+    P.moving = true;
+    P.x += 3;
+    if (!(U && P.face === 2) && !(D && P.face === 0)) P.face = 1;
+  }
+  if (D && !U) {
+    if (!P.moving) P.frame = 1;
+    P.moving = true;
+    P.y += 3;
+    if (!(R && P.face === 1) && !(L && P.face === 3)) P.face = 0;
+  }
+}
 function stepPlayer() {
   if (DLG || creamConv === 2) { P.moving = false; P.frame = 0; return; }
   px = P.x; py = P.y;
   const L = keys["arrowleft"] || keys["a"], R = keys["arrowright"] || keys["d"];
   const U = keys["arrowup"] || keys["w"], D = keys["arrowdown"] || keys["s"];
-// entry is input plus slide. the take's bare x=xprevious targets ice
-// instances, never the player. locked skips input, 2 extra glides.
+// other_19 reverts the walked step, then glides on slide velocity.
+// alarm_0 zeroes out and the next input step runs the same frame.
   let held = L || R || U || D;
   if (P.sliding) {
     if (--P.iceT <= 0) {
-      // Alarm_0: zero velocity, frame 0, unlock. dead step: no input
-      // move below, but the ice check still runs and can re-take.
       P.vx = P.vy = 0; P.sliding = false; P.frame = 0;
+      walkInput(L, R, U, D);
       if (iceOverlap()) {
+        P.x = px; P.y = py;
         P.sliding = true; P.iceT = 3;
         iceTake(L, R, U, D);
         P.x += P.vx; P.y += P.vy;
         slideCollide();
+        P.moving = (P.x !== px || P.y !== py);
+        if (!P.moving) P.frame = 0;
+      } else {
+        collidePlayer();
       }
     } else {
 // locked glide, no input. overlap re-arms; stopped takes held keys.
@@ -551,37 +586,11 @@ function stepPlayer() {
     P.moving = (P.x !== px || P.y !== py);
     if (!P.moving) P.frame = 0;
   } else {
-    if (L) {
-      held = true;
-      if (!P.moving) P.frame = 1;
-      P.moving = true;
-      P.x -= 3;
-      if (!(U && P.face === 2) && !(D && P.face === 0)) P.face = 3;
-    }
-    if (U) {
-      held = true;
-      if (!P.moving) P.frame = 1;
-      P.moving = true;
-      P.y -= 3;
-      if (!(R && P.face === 1) && !(L && P.face === 3)) P.face = 2;
-    }
-    if (R && !L) {
-      held = true;
-      if (!P.moving) P.frame = 1;
-      P.moving = true;
-      P.x += 3;
-      if (!(U && P.face === 2) && !(D && P.face === 0)) P.face = 1;
-    }
-    if (D && !U) {
-      held = true;
-      if (!P.moving) P.frame = 1;
-      P.moving = true;
-      P.y += 3;
-      if (!(R && P.face === 1) && !(L && P.face === 3)) P.face = 0;
-    }
+    walkInput(L, R, U, D);
     if (iceOverlap()) {
-// entry locks and reads held keys, sliding atop the input move.
+// entry reverts the walked step, then glides on the take.
 // residual speed skips the take, unreachable in normal play.
+      P.x = px; P.y = py;
       P.sliding = true; P.iceT = 3;
       if (P.vx === 0 && P.vy === 0) {
         iceTake(L, R, U, D);
@@ -592,6 +601,7 @@ function stepPlayer() {
       if (!P.moving) P.frame = 0;
     } else {
       collidePlayer();
+      P.moving = (P.x !== px || P.y !== py);
     }
   }
   if (!held && !P.sliding) P.moving = false;
@@ -619,7 +629,8 @@ function step() {
 
   if (B.falling === 1) {
     B.vy += 0.1; B.y += B.vy;
-    if (B.y >= B.specialy) { B.y = B.specialy; B.vy = 0; B.falling = 0; }
+    B.angle += ((Math.abs(B.vx) + Math.abs(B.vy)) * 30) / (B.size * 10);
+    if (B.y > B.specialy) { B.y = B.specialy; B.vy = 0; B.falling = 0; }
     return;
   }
 
@@ -627,8 +638,8 @@ function step() {
   {
     const bb = ballBox();
     if (boxGap(bb, HOLEBOX) < 8) {
-      if (bb.y + bb.h < HOLEBOX.y) B.y += 0.2;
-      if (bb.y > HOLEBOX.y + HOLEBOX.h) B.y -= 0.2;
+      if (bb.y + bb.h <= HOLEBOX.y) B.y += 0.2;
+      if (bb.y >= HOLEBOX.y + HOLEBOX.h) B.y -= 0.2;
       if (B.x < HOLE.x + HOLE.w / 2) B.x += 0.2;
       if (B.x > HOLE.x + HOLE.w / 2) B.x -= 0.2;
     }
@@ -664,10 +675,10 @@ function step() {
       let sp = Math.hypot(B.vx, B.vy);
       sp = sp <= 0.06 ? 0 : sp - 0.05;
       const bb = ballBox();
-      if (s.x + s.w < bb.x) { B.x += 2; B.vx = -B.vx; }
-      if (s.x > bb.x + bb.w) { B.x -= 2; B.vx = -B.vx; }
-      if (s.y > bb.y + bb.h) { B.y -= 2; B.vy = -B.vy; }
-      if (s.y + s.h < bb.y) { B.y += 2; B.vy = -B.vy; }
+      if (s.x + s.w <= bb.x) { B.x += 2; B.vx = -B.vx; }
+      if (s.x >= bb.x + bb.w) { B.x -= 2; B.vx = -B.vx; }
+      if (s.y >= bb.y + bb.h) { B.y -= 2; B.vy = -B.vy; }
+      if (s.y + s.h <= bb.y) { B.y += 2; B.vy = -B.vy; }
       const ns = Math.hypot(B.vx, B.vy) || 1;
       B.vx *= sp / ns; B.vy *= sp / ns;
       if (sp === 0) { B.vx = B.vy = 0; }
@@ -677,7 +688,7 @@ function step() {
   }
 
   if (B.falling === 0 && B.alarm <= 0 && rectsHit(playerBox(), ballBox())) {
-    const pcx = P.x + 10, pcy = P.y + 24;
+    const pcx = P.x + 9.5, pcy = P.y + 24;
     const ang = Math.atan2(pcy - B.y, pcx - B.x);
     const sp = 4 + 1 / B.size + 0.1;
     B.vx = -Math.cos(ang) * sp; B.vy = -Math.sin(ang) * sp;
@@ -795,7 +806,13 @@ function draw() {
   }
   if (FLAG.on) {
     const fy = FLAG.y;
-    actors.push({ k: fy * 10 + 40 * 10, f: () => ctx.drawImage(SPR.flag[FLAG.idx], HOLE.x, fy) });
+    actors.push({ k: fy * 10 + 40 * 10, f: () => {
+// draw_self_custom clips the pole below ystart+40 (hole line, y=450),
+// so only rows fy..450 show while it rises.
+      const visH = HOLE.y + 10 - fy + 1;
+      if (visH <= 0) return;
+      ctx.drawImage(SPR.flag[FLAG.idx], 0, 0, 21, visH, HOLE.x, fy, 21, visH);
+    } });
   }
   actors.sort((a, b) => a.k - b.k).forEach((a) => a.f());
   if (tilesReady) ctx.drawImage(TILEFC, TILE_OX, TILE_OY);
