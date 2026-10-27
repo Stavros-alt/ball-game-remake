@@ -1,7 +1,6 @@
 # ball game
 
-browser clone of the snow ball game, traced from the original `data.win`.
-sprites ripped from an owned copy into `assets/`.
+browser clone of the snow ball game, traced from the owned copy's data.win.
 
 ## run
 
@@ -12,8 +11,11 @@ python3 -m http.server
 
 ## controls
 
-arrows / WASD move, Z read signs, R reset.
+* arrows / WASD move, Z read signs and advance text, X complete the page
+* left / right choose at prompts, R reset attempt
 
-## license
+sprites belong to toby fox. code is MIT, see LICENSE.
 
-MIT. see LICENSE. sprites belong to toby fox.
+## ball game
+
+* BALL GAME!!!
