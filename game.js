@@ -867,4 +867,8 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 resetAttempt();
+// touch only devices get the warning. touchscreen laptops pass through.
+if (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) {
+  document.getElementById("mobilewarn").hidden = false;
+}
 requestAnimationFrame(loop);

@@ -7,16 +7,25 @@
 <style>
 html,body{margin:0;height:100%;background:#000;display:flex;align-items:center;justify-content:center}
 canvas{image-rendering:pixelated;background:#000}
+#mobilewarn{position:fixed;inset:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;z-index:10;padding:24px}
+#mobilewarn[hidden]{display:none}
+#mobilewarn .box{max-width:520px;font-family:"DeterminationMono",monospace;font-size:16px;line-height:1.8}
+#mobilewarn a{margin-top:16px;display:inline-block;font-family:inherit;font-size:16px;background:#000;color:#888;border:2px solid #888;padding:8px 16px;cursor:pointer;text-decoration:none}
 @font-face{font-family:"DeterminationSans";src:url("assets/DeterminationSans.otf")}
 @font-face{font-family:"DeterminationMono";src:url("assets/DeterminationMono.otf")}
 </style>
 </head>
 <body>
 <canvas id="game" width="640" height="480"></canvas>
+<div id="mobilewarn" hidden><div class="box">
+<p>Listen buddy... I could make the controls work on mobile, but not even I, sadist that I may be, would make somebody suffer through "Ball Game" with mobile controls.</p>
+<p>Try again on something with a keyboard.</p>
+<a id="suffer" href="https://stavros-alt.github.io/drSongRanker/">take me back to the ranker</a>
+</div></div>
 <script src="map.js?v=11"></script>
 <script src="tiles.js?v=10"></script>
 <script src="text.js?v=1"></script>
 <script src="font.js?v=1"></script>
-<script src="game.js?v=24"></script>
+<script src="game.js?v=25"></script>
 </body>
 </html>
